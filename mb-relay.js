@@ -440,6 +440,35 @@ function createRelay(options) {
         res.on('close', () => clearInterval(timer));
         return;
       }
+      // Diagnostics: an otherwise silent stream, optionally kept warm with an
+      // SSE comment line. Comparing the two tells you whether the edge in front
+      // of this service reaps idle flows, and at what interval.
+      if (pathname === `${prefix}/selftest/idle`) {
+        if (!authed(url)) { json(res, 403, { ok: false }); return; }
+        const secs = Math.min(Number(url.searchParams.get('secs') || '90') || 90, 600);
+        const every = Math.max(Number(url.searchParams.get('every') || '2500') || 2500, 0);
+        res.writeHead(200, {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-store',
+          connection: 'close',
+        });
+        const started = Date.now();
+        let ticks = 0;
+        const timer = every > 0 ? setInterval(() => {
+          ticks += 1;
+          try { res.write(`: keepalive ${ticks} ${Date.now() - started}ms\n\n`); } catch { }
+        }, every) : null;
+        const stop = setTimeout(() => {
+          if (timer) clearInterval(timer);
+          try { res.end(); } catch { }
+        }, secs * 1000);
+        res.on('close', () => {
+          if (timer) clearInterval(timer);
+          clearTimeout(stop);
+          note(`selftest/idle ended after ${((Date.now() - started) / 1000).toFixed(1)}s (${ticks} ticks, every ${every}ms)`);
+        });
+        return;
+      }
       if (pathname === `${prefix}/t` || pathname.startsWith(`${prefix}/t/`)) {
         handleTunnel(req, res, url);
         return;
