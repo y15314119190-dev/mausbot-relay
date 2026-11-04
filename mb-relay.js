@@ -110,12 +110,16 @@ function createRelay(options) {
     const now = Date.now();
     for (const [id, conn] of conns) {
       if (!conn.sse || !conn.said || conn.socket.destroyed) continue;
-      // 2.5s, not 20s: some edges (Render's included) reap a flow that has been
-      // quiet for ten-odd seconds, and a reaped flow looks perfectly open to
-      // both ends while every later byte vanishes.
-      if (now - (conn.lastWrite || 0) < 2500) continue;
+      if (now - (conn.lastWrite || 0) < 8000) continue;
       try {
-        conn.socket.write(': mb-keepalive\n\n');
+        const payload = ': mb-keepalive\n\n';
+        conn.socket.write(conn.chunked
+          ? Buffer.concat([
+            Buffer.from(payload.length.toString(16) + '\r\n', 'latin1'),
+            Buffer.from(payload, 'latin1'),
+            Buffer.from('\r\n', 'latin1'),
+          ])
+          : payload);
         conn.lastWrite = now;
       } catch {
         conns.delete(id);
@@ -185,6 +189,10 @@ function createRelay(options) {
         // exactly how a reply goes missing on the phone. A comment line is
         // ignored by the client and keeps the flow demonstrably alive.
         conn.sse = /content-type:\s*text\/event-stream/i.test(lead);
+        // If the body is chunk-framed, anything we write must be framed too,
+        // or the client's parser sees our comment line where a chunk size
+        // belongs and drops the whole stream.
+        conn.chunked = /transfer-encoding:\s*chunked/i.test(lead);
         note(`<- #${m.id} ${line}`);
       }
       conn.lastWrite = Date.now();
