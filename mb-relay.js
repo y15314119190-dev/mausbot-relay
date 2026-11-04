@@ -110,7 +110,10 @@ function createRelay(options) {
     const now = Date.now();
     for (const [id, conn] of conns) {
       if (!conn.sse || !conn.said || conn.socket.destroyed) continue;
-      if (now - (conn.lastWrite || 0) < 20000) continue;
+      // 2.5s, not 20s: some edges (Render's included) reap a flow that has been
+      // quiet for ten-odd seconds, and a reaped flow looks perfectly open to
+      // both ends while every later byte vanishes.
+      if (now - (conn.lastWrite || 0) < 2500) continue;
       try {
         conn.socket.write(': mb-keepalive\n\n');
         conn.lastWrite = now;
@@ -119,7 +122,7 @@ function createRelay(options) {
         try { conn.socket.destroy(); } catch { }
       }
     }
-  }, 10000);
+  }, 2500);
   if (keepalive.unref) keepalive.unref();
 
   // ---------------------------------------------------------------- outbound
