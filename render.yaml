@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: mausbot-relay
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install --no-audit --no-fund
+    startCommand: node server.js
+    healthCheckPath: /__mb/ping
+    autoDeploy: true
+    envVars:
+      - key: MB_TOKEN
+        generateValue: true

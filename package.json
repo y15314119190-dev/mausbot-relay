@@ -1,0 +1,13 @@
+{
+  "name": "mausbot-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone long-poll tunnel between the OpenMausBot phone app and a Mac",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
